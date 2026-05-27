@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1A1A2E"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 标题 -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🦞 PicoClaw PhoneLink v2.0"
+            android:textColor="#E94560"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="HTTP POST 数据通道"
+            android:textColor="#888888"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:paddingBottom="12dp" />
+
+        <!-- 权限状态 -->
+        <TextView
+            android:id="@+id/tvPermStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="权限状态：检查中..."
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"
+            android:background="#2D2D44"
+            android:padding="8dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- 服务器地址 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="服务器地址 (HTTP POST):"
+            android:textColor="#CCCCCC"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/etServerUrl"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="http://frp-rib.com:63467/api/phone-data"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666666"
+            android:background="#2D2D44"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:inputType="textUri"
+            android:textSize="14sp"
+            android:singleLine="true"
+            android:layout_marginBottom="4dp" />
+
+        <!-- 连接状态 -->
+        <TextView
+            android:id="@+id/tvConnectionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚪ 未发送"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:paddingBottom="12dp" />
+
+        <!-- 操作按钮行 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnCollect"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="立即采集"
+                android:textAllCaps="false"
+                android:backgroundTint="#0F3460"
+                android:textColor="#FFFFFF"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/btnSendWs"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="重新发送"
+                android:textAllCaps="false"
+                android:backgroundTint="#E94560"
+                android:textColor="#FFFFFF"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- 自动采集开关 -->
+        <Switch
+            android:id="@+id/swAutoCollect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔄 自动采集（每5分钟）"
+            android:textColor="#AAAAAA"
+            android:textSize="13sp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 数据展示 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="采集数据："
+            android:textColor="#CCCCCC"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvDataDisplay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="等待采集..."
+            android:textColor="#00FF88"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:background="#0D1117"
+            android:padding="12dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- 底部说明 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="使用说明：\n1. 授权所需权限\n2. 填写服务器地址 (http://域名:端口/api/phone-data)\n3. 点击「立即采集」\n4. 可开启自动采集\n\nSakura Frp 隧道类型: TCP（无需备案）"
+            android:textColor="#666666"
+            android:textSize="11sp"
+            android:lineSpacingExtra="4dp"
+            android:paddingBottom="32dp" />
+
+    </LinearLayout>
+</ScrollView>
