@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+@androidx.compose.material3.ExperimentalMaterial3Api
 private fun PhoneLinkApp() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("PhoneLinkPrefs", 0) }
