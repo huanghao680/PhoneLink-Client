@@ -1,5 +1,7 @@
 # 🦞 PicoClaw PhoneLink Client
 
+客户端使用 Kotlin + Jetpack Compose 重制，提供 Material 3 与 MiuiX 两套可即时切换的 UI 外壳；采集和发送逻辑共享，主题选择会持久化。
+
 Android 手机数据采集 App，实时采集手机状态并发送给 PicoClaw 服务器。
 
 ## 📱 功能

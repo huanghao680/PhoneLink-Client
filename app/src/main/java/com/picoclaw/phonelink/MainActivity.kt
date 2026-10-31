@@ -1,396 +1,245 @@
 package com.picoclaw.phonelink
 
 import android.Manifest
-import android.app.AppOpsManager
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.content.pm.PackageManager
-import android.graphics.Color
-import android.location.Geocoder
-import android.location.LocationManager
-import android.util.Log
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.concurrent.thread
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.google.gson.GsonBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
-class MainActivity : AppCompatActivity() {
+private enum class PhoneLinkTheme { MATERIAL3, MIUIX }
 
-    private lateinit var tvStatus: TextView
-    private lateinit var tvPermStatus: TextView
-    private lateinit var etServerUrl: EditText
-    private lateinit var tvConnectionStatus: TextView
-    private lateinit var btnCollect: Button
-    private lateinit var btnSendWs: Button
-    private lateinit var swAutoCollect: Switch
-    private lateinit var tvDataDisplay: TextView
-
-    private val handler = Handler(Looper.getMainLooper())
-    private var autoCollectRunnable: Runnable? = null
-    private var isAutoCollecting = false
-    private var lastCollectedData: JSONObject? = null
-
-    companion object {
-        private const val TAG = "PhoneLink"
-        private const val PREFS_NAME = "PhoneLinkPrefs"
-        private const val KEY_SERVER_URL = "server_url"
-        private const val KEY_AUTO_COLLECT = "auto_collect"
-        private const val REQUEST_PERMISSIONS = 100
-        private const val AUTO_COLLECT_INTERVAL = 5 * 60 * 1000L
-        private const val DEFAULT_SERVER_URL = "http://frp-rib.com:63467/api/phone-data"
-    }
-
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        tvStatus = findViewById(R.id.tvStatus)
-        tvPermStatus = findViewById(R.id.tvPermStatus)
-        etServerUrl = findViewById(R.id.etServerUrl)
-        tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
-        btnCollect = findViewById(R.id.btnCollect)
-        btnSendWs = findViewById(R.id.btnSendWs)
-        swAutoCollect = findViewById(R.id.swAutoCollect)
-        tvDataDisplay = findViewById(R.id.tvDataDisplay)
-
-        tvStatus.text = "🦞 PicoClaw PhoneLink v2.0"
-
-        loadSettings()
-        requestAllPermissions()
-
-        // 手动采集按钮（采集 + 发送）
-        btnCollect.setOnClickListener {
-            btnCollect.isEnabled = false
-            btnCollect.text = "采集中..."
-            thread {
-                val data = collectAllData()
-                lastCollectedData = data
-                runOnUiThread {
-                    tvDataDisplay.text = formatDataForDisplay(data)
-                }
-                sendDataToServer(data)
-                runOnUiThread {
-                    btnCollect.isEnabled = true
-                    btnCollect.text = "立即采集"
-                }
-            }
-        }
-
-        // "发送"按钮改为"重新发送上次数据"
-        btnSendWs.text = "重新发送"
-        btnSendWs.setOnClickListener {
-            val data = lastCollectedData
-            if (data != null) {
-                sendDataToServer(data)
-            } else {
-                Toast.makeText(this, "请先采集数据", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        swAutoCollect.setOnCheckedChangeListener { _, isChecked ->
-            isAutoCollecting = isChecked
-            saveSettings()
-            if (isChecked) startAutoCollect() else stopAutoCollect()
-        }
-
-        if (swAutoCollect.isChecked) startAutoCollect()
-        handler.postDelayed({ updatePermStatus() }, 500)
+        setContent { PhoneLinkApp() }
     }
+}
 
-    // ============================================================
-    // 权限管理
-    // ============================================================
-
-    private fun requestAllPermissions() {
-        val perms = mutableListOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.ACCESS_WIFI_STATE,
-            Manifest.permission.ACCESS_NETWORK_STATE,
-            Manifest.permission.POST_NOTIFICATIONS
+@Composable
+private fun PhoneLinkApp() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("PhoneLinkPrefs", 0) }
+    var theme by rememberSaveable {
+        mutableStateOf(
+            if (prefs.getString("ui_theme", "material3") == "miuix")
+                PhoneLinkTheme.MIUIX else PhoneLinkTheme.MATERIAL3
         )
-        ActivityCompat.requestPermissions(this, perms.toTypedArray(), REQUEST_PERMISSIONS)
     }
+    val colors = if (theme == PhoneLinkTheme.MIUIX) {
+        darkColorScheme(
+            primary = Color(0xFFFF8A00), secondary = Color(0xFF3D9DFF),
+            surface = Color(0xFF17181C), background = Color(0xFF101114)
+        )
+    } else dynamicLightColorScheme(context)
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        updatePermStatus()
+    MaterialTheme(colorScheme = colors, shapes = if (theme == PhoneLinkTheme.MIUIX) {
+        androidx.compose.material3.Shapes(
+            small = RoundedCornerShape(12.dp),
+            medium = RoundedCornerShape(20.dp),
+            large = RoundedCornerShape(24.dp)
+        )
+    } else androidx.compose.material3.Shapes()) {
+        PhoneLinkScreen(theme) {
+            theme = it
+            prefs.edit().putString("ui_theme", if (it == PhoneLinkTheme.MIUIX) "miuix" else "material3").apply()
+        }
     }
+}
 
-    private fun updatePermStatus() {
-        val hasLoc = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val hasPhone = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
-        val hasNotif = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+@Composable
+private fun PhoneLinkScreen(theme: PhoneLinkTheme, onThemeChange: (PhoneLinkTheme) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { context.getSharedPreferences("PhoneLinkPrefs", 0) }
+    var url by rememberSaveable { mutableStateOf(prefs.getString("server_url", "") ?: "") }
+    var status by rememberSaveable { mutableStateOf("等待采集") }
+    var payload by rememberSaveable { mutableStateOf("尚未采集数据") }
+    var busy by rememberSaveable { mutableStateOf(false) }
+    var automatic by rememberSaveable { mutableStateOf(prefs.getBoolean("auto_collect", false)) }
+    val collector = remember { DataCollector(context) }
+    val permissions = arrayOf(
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.READ_PHONE_STATE,
+        Manifest.permission.POST_NOTIFICATIONS
+    )
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { status = "权限状态已更新" }
 
-        tvPermStatus.text = "权限: ${if (hasLoc) "✅" else "❌"}定位  ${if (hasPhone) "✅" else "❌"}手机  ${if (hasNotif) "✅" else "⚠️"}通知"
-    }
-
-    // ============================================================
-    // 数据发送 — 纯 HTTP POST
-    // ============================================================
-
-    private fun sendDataToServer(data: JSONObject) {
-        val serverUrl = etServerUrl.text.toString().trim()
-        if (serverUrl.isEmpty()) {
-            runOnUiThread { Toast.makeText(this, "❌ 请输入服务器地址", Toast.LENGTH_SHORT).show() }
+    fun collectAndSend() {
+        if (url.isBlank()) {
+            status = "请先填写服务器地址"
             return
         }
-
-        thread {
-            runOnUiThread {
-                tvConnectionStatus.text = "🔄 正在发送..."
-                tvConnectionStatus.setTextColor(Color.parseColor("#FF9800"))
+        busy = true
+        scope.launch {
+            val result = runCatching {
+                val data = collector.collectAll()
+                val json = GsonBuilder().setPrettyPrinting().create().toJson(data)
+                val code = postJson(url, json)
+                json to code
             }
+            result.onSuccess {
+                payload = it.first
+                status = if (it.second in 200..299) "发送成功（HTTP ${it.second}）" else "服务器返回 HTTP ${it.second}"
+            }.onFailure { status = "发送失败：${it.message ?: "未知错误"}" }
+            busy = false
+        }
+    }
 
-            try {
-                val url = URL(serverUrl)
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                conn.setRequestProperty("User-Agent", "PicoClaw-PhoneLink/2.0")
-                conn.doOutput = true
-                conn.connectTimeout = 10000
-                conn.readTimeout = 10000
+    LaunchedEffect(automatic) {
+        if (automatic) {
+            while (true) {
+                collectAndSend()
+                delay(5 * 60 * 1000L)
+            }
+        }
+    }
 
-                val body = data.toString().toByteArray(Charsets.UTF_8)
-                conn.outputStream.write(body)
-                conn.outputStream.flush()
-
-                val code = conn.responseCode
-                val resp = if (code in 200..299) {
-                    conn.inputStream.bufferedReader().readText()
-                } else {
-                    conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
+    Scaffold(topBar = {
+        TopAppBar(title = {
+            Column {
+                Text("PhoneLink", style = MaterialTheme.typography.titleLarge)
+                Text(if (theme == PhoneLinkTheme.MIUIX) "MiuiX 风格" else "Material 3 风格",
+                    style = MaterialTheme.typography.labelSmall)
+            }
+        }, actions = {
+            Icon(Icons.Default.Settings, contentDescription = "设置", modifier = Modifier.padding(end = 16.dp))
+        })
+    }) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("手机状态同步", style = MaterialTheme.typography.headlineSmall)
+                    Text("采集设备、网络、电量和位置，并发送到你的 PhoneLink Server。",
+                        style = MaterialTheme.typography.bodyMedium)
                 }
-                conn.disconnect()
-
-                if (code in 200..299) {
-                    val ts = data.optString("timestamp", "")
-                    runOnUiThread {
-                        tvConnectionStatus.text = "✅ 发送成功 [$ts]"
-                        tvConnectionStatus.setTextColor(Color.parseColor("#4CAF50"))
+            }
+            Card {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("服务器", style = MaterialTheme.typography.titleMedium)
+                    OutlinedTextField(
+                        value = url, onValueChange = { url = it; prefs.edit().putString("server_url", it).apply() },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        label = { Text("HTTP POST 地址") },
+                        placeholder = { Text("http://192.168.1.2:8765/api/phone-data") }
+                    )
+                    Text(status, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = ::collectAndSend, enabled = !busy, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.CloudUpload, contentDescription = null)
+                    Spacer(Modifier.padding(3.dp))
+                    Text("立即采集")
+                }
+                Button(onClick = ::collectAndSend, enabled = !busy, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(Modifier.padding(3.dp))
+                    Text("重新发送")
+                }
+            }
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Card {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("自动采集（每 5 分钟）")
+                        Switch(checked = automatic, onCheckedChange = {
+                            automatic = it
+                            prefs.edit().putBoolean("auto_collect", it).apply()
+                        })
                     }
-                    Log.d(TAG, "POST OK: $resp")
-                } else {
-                    runOnUiThread {
-                        tvConnectionStatus.text = "❌ HTTP $code: $resp"
-                        tvConnectionStatus.setTextColor(Color.parseColor("#F44336"))
+                    Text("权限", style = MaterialTheme.typography.titleSmall)
+                    Button(onClick = { permissionLauncher.launch(permissions) }) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        Spacer(Modifier.padding(3.dp))
+                        Text("授权所需权限")
                     }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "POST error", e)
-                runOnUiThread {
-                    tvConnectionStatus.text = "❌ 连接失败: ${e.message}\n💡 确保服务器运行中 & 隧道类型为TCP"
-                    tvConnectionStatus.setTextColor(Color.parseColor("#F44336"))
-                }
             }
-        }
-    }
-
-    // ============================================================
-    // 数据采集
-    // ============================================================
-
-    private fun collectAllData(): JSONObject {
-        val data = JSONObject()
-        try {
-            data.put("timestamp", SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.CHINA).format(Date()))
-            data.put("timezone", TimeZone.getDefault().id)
-            data.put("appId", packageName)
-            data.put("foreground", getForegroundApp())
-            data.put("device", getDeviceInfo())
-            data.put("battery", getBatteryInfo())
-            data.put("location", getLocation())
-            data.put("network", getNetworkInfo())
-        } catch (e: Exception) {
-            data.put("error", e.message)
-        }
-        return data
-    }
-
-    private fun getForegroundApp(): JSONObject {
-        val info = JSONObject()
-        try {
-            info.put("appName", "PhoneLink")
-            info.put("packageName", packageName)
-            info.put("activity", "MainActivity")
-        } catch (e: Exception) { info.put("error", e.message) }
-        return info
-    }
-
-    private fun getDeviceInfo(): JSONObject {
-        val info = JSONObject()
-        try {
-            info.put("model", Build.MODEL)
-            info.put("brand", Build.BRAND)
-            info.put("device", Build.DEVICE)
-            info.put("sdkVersion", Build.VERSION.SDK_INT)
-            info.put("release", Build.VERSION.RELEASE)
-            info.put("resolution", "${resources.displayMetrics.widthPixels}x${resources.displayMetrics.heightPixels}")
-        } catch (e: Exception) { info.put("error", e.message) }
-        return info
-    }
-
-    private fun getBatteryInfo(): JSONObject {
-        val info = JSONObject()
-        try {
-            val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            if (intent != null) {
-                val level = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 0)
-                val scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)
-                val status = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, 0)
-                val temp = intent.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0)
-                info.put("level", (level * 100.0 / scale).toInt())
-                info.put("charging", status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL)
-                info.put("temperature", temp / 10.0)
-            }
-        } catch (e: Exception) { info.put("error", e.message) }
-        return info
-    }
-
-    private fun getLocation(): JSONObject {
-        val info = JSONObject()
-        try {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                val lm = getSystemService(LOCATION_SERVICE) as LocationManager
-                val loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                    ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                if (loc != null) {
-                    info.put("latitude", loc.latitude)
-                    info.put("longitude", loc.longitude)
-                    info.put("accuracy", loc.accuracy)
-                    try {
-                        val addr = Geocoder(this, Locale.CHINA).getFromLocation(loc.latitude, loc.longitude, 1)
-                        if (!addr.isNullOrEmpty()) info.put("address", addr[0].getAddressLine(0) ?: "")
-                    } catch (_: Exception) {}
-                } else {
-                    info.put("error", "无定位数据")
-                }
-            } else {
-                info.put("error", "无定位权限")
-            }
-        } catch (e: Exception) { info.put("error", e.message) }
-        return info
-    }
-
-    private fun getNetworkInfo(): JSONObject {
-        val info = JSONObject()
-        try {
-            val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-            val net = cm.activeNetwork
-            if (net != null) {
-                val caps = cm.getNetworkCapabilities(net)
-                if (caps != null) {
-                    when {
-                        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> info.put("type", "WiFi")
-                        caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> info.put("type", "Mobile")
-                        else -> info.put("type", "Other")
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("外观", style = MaterialTheme.typography.titleMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                        FilterChip(selected = theme == PhoneLinkTheme.MATERIAL3,
+                            onClick = { onThemeChange(PhoneLinkTheme.MATERIAL3) }, label = { Text("Material 3") })
+                        FilterChip(selected = theme == PhoneLinkTheme.MIUIX,
+                            onClick = { onThemeChange(PhoneLinkTheme.MIUIX) }, label = { Text("MiuiX") })
                     }
-                    info.put("wifiConnected", caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
                 }
             }
-        } catch (e: Exception) { info.put("error", e.message) }
-        return info
-    }
-
-    // ============================================================
-    // 自动采集
-    // ============================================================
-
-    private fun startAutoCollect() {
-        stopAutoCollect()
-        autoCollectRunnable = object : Runnable {
-            override fun run() {
-                if (!isAutoCollecting) return
-                thread {
-                    val data = collectAllData()
-                    lastCollectedData = data
-                    runOnUiThread { tvDataDisplay.text = formatDataForDisplay(data) }
-                    sendDataToServer(data)
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("最近采集数据", style = MaterialTheme.typography.titleMedium)
+                    Text(payload, modifier = Modifier.padding(top = 8.dp),
+                        fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                 }
-                handler.postDelayed(this, AUTO_COLLECT_INTERVAL)
             }
         }
-        handler.postDelayed(autoCollectRunnable!!, 1000)
-        Toast.makeText(this, "🔄 自动采集已开启 (每5分钟)", Toast.LENGTH_SHORT).show()
     }
+}
 
-    private fun stopAutoCollect() {
-        autoCollectRunnable?.let { handler.removeCallbacks(it) }
-        autoCollectRunnable = null
-    }
-
-    // ============================================================
-    // 显示格式化
-    // ============================================================
-
-    private fun formatDataForDisplay(data: JSONObject): String {
-        val sb = StringBuilder()
-        sb.appendLine("═══════════════════════════════════")
-        sb.appendLine("📱 手机数据报告")
-        sb.appendLine("═══════════════════════════════════")
-        sb.appendLine()
-        sb.appendLine("⏰ ${data.optString("timestamp", "N/A")}")
-        sb.appendLine()
-
-        data.optJSONObject("foreground")?.let { fg ->
-            sb.appendLine("📱 前台: ${fg.optString("appName", "?")} (${fg.optString("packageName", "?")})")
-        }
-        data.optJSONObject("battery")?.let { b ->
-            sb.appendLine("🔋 电量: ${b.optInt("level", 0)}% (${if (b.optBoolean("charging")) "充电" else "放电"})")
-            sb.appendLine("   温度: ${b.optDouble("temperature", 0.0)}°C")
-        }
-        data.optJSONObject("location")?.let { loc ->
-            val lat = loc.optDouble("latitude", 0.0)
-            val lon = loc.optDouble("longitude", 0.0)
-            if (lat != 0.0 || lon != 0.0) {
-                sb.appendLine("📍 位置: $lat, $lon (±${loc.optDouble("accuracy", 0.0)}m)")
-            }
-            loc.optString("address", "").takeIf { it.isNotEmpty() }?.let { sb.appendLine("   $it") }
-        }
-        data.optJSONObject("device")?.let { dev ->
-            sb.appendLine("📱 设备: ${dev.optString("brand", "")} ${dev.optString("model", "")}")
-            sb.appendLine("   Android ${dev.optString("release", "")} (API ${dev.optInt("sdkVersion", 0)})")
-        }
-        data.optJSONObject("network")?.let { net ->
-            sb.appendLine("📶 网络: ${net.optString("type", "?")} / WiFi: ${if (net.optBoolean("wifiConnected")) "是" else "否"}")
-        }
-        sb.appendLine("═══════════════════════════════════")
-        return sb.toString()
-    }
-
-    // ============================================================
-    // 设置持久化
-    // ============================================================
-
-    private fun loadSettings() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        etServerUrl.setText(prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL))
-        swAutoCollect.isChecked = prefs.getBoolean(KEY_AUTO_COLLECT, false)
-    }
-
-    private fun saveSettings() {
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
-            .putString(KEY_SERVER_URL, etServerUrl.text.toString())
-            .putBoolean(KEY_AUTO_COLLECT, swAutoCollect.isChecked)
-            .apply()
-    }
-
-    override fun onPause() { super.onPause(); saveSettings() }
-    override fun onDestroy() { stopAutoCollect(); super.onDestroy() }
+private suspend fun postJson(url: String, payload: String): Int = withContext(Dispatchers.IO) {
+    val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).build()
+    val request = Request.Builder().url(url).post(payload.toRequestBody("application/json".toMediaType())).build()
+    client.newCall(request).execute().use { it.code }
 }
