@@ -21,6 +21,11 @@ jobs:
           distribution: 'temurin'
 
       - name: Install Android SDK packages
+        uses: android-actions/setup-android@v3
+        continue-on-error: true
+        with:
+          cmdline-tools-version: '11076708'
+      - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
