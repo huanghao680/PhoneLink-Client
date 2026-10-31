@@ -25,6 +25,11 @@ jobs:
         continue-on-error: true
         with:
           cmdline-tools-version: '11076708'
+      - name: Add Android SDK tools to PATH
+        run: |
+          sdkmanager_path="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -type f -name sdkmanager -print -quit)"
+          test -n "$sdkmanager_path"
+          echo "$(dirname "$sdkmanager_path")" >> "$GITHUB_PATH"
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses || true
